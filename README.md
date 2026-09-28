@@ -61,6 +61,41 @@ Or call the script directly:
 
 The `url` form never contacts Spotify, so it works without credentials.
 
+## Development
+
+Run the tests and the linter. Neither needs network access or credentials:
+
+```sh
+make test         # unit tests, no I/O
+make lint         # report style and likely-bug findings
+make format       # autofix, then format in place
+make check        # lint + tests, what to run before committing
+```
+
+Tests live in `test_sample_downloader.py` and cover the pure helpers —
+filename generation, the dedup index, URL validation, and the matching
+heuristic. They run in well under a second and are safe to run at any time.
+
+Linting and formatting use [ruff](https://docs.astral.sh/ruff/), configured in
+`ruff.toml`. It runs through `uvx`, so it is not a dependency of the app and
+does not appear in `uv pip list`.
+
+Ruff is also wired into the editor: with the ruff LSP installed, diagnostics and
+format-on-save show up inline. Without it, `make format` covers the same ground
+from the command line.
+
+Two things that are deliberately not linted:
+
+- **Line length** (`E501` is off). A few long comment and assertion lines read
+  better unwrapped, and the formatter handles anything it can wrap.
+- **Type correctness.** Ruff checks annotations, not whether they're accurate.
+  Several functions are unannotated, so mypy would flag more than it could
+  currently confirm.
+
+`make test-pull` is separate from `make test` on purpose: it does real network
+calls and writes real files, so it belongs to manual verification rather than
+the test suite.
+
 ## Configuration
 
 Everything is an environment variable, read from the real environment first and
@@ -121,22 +156,3 @@ the dedup key, so a track downloads exactly once.
 - **A first run downloads a lot.** This playlist shares almost nothing with the
   existing contents of your samples folder, so expect ~100 tracks and 15–25
   minutes. Use `make test-pull` first.
-
-## Caveats
-
-This scrapes YouTube search results via `pytubefix` rather than using the
-YouTube Data API, which means no API key and no quota, but also that it breaks
-when YouTube changes its internals. You'll see this in the logs regularly:
-
-```
-WARNING - VISION_OS client returned: This video is not available
-WARNING - Switching to client: TV
-```
-
-That's pytubefix trying one client, getting refused, and retrying with another.
-It's normal noise and it recovers on its own.
-
-Downloading audio this way goes against YouTube's terms of service. It's a tool
-for personal use. Note also that `Search` can return covers, remasters, live
-cuts, and long compilations instead of the recording you want — the matcher
-narrows that down but doesn't eliminate it, so spot-check the output.
