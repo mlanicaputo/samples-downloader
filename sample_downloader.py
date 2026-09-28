@@ -24,10 +24,8 @@ Usage:
 The single-url form never contacts Spotify, so it works without credentials.
 """
 
-from pytubefix import YouTube, Search
-from pytubefix.cli import on_progress
-
 import argparse
+import base64
 import difflib
 import logging
 import os
@@ -35,13 +33,10 @@ import re
 import sys
 import unicodedata
 
-import json
-import base64
-
 import requests as http
 from dotenv import load_dotenv
-from typing import List, Optional
-
+from pytubefix import Search, YouTube
+from pytubefix.cli import on_progress
 
 # Read .env before anything touches os.environ. Values already exported in the
 # shell win, so an explicit export still overrides the file.
@@ -49,8 +44,8 @@ load_dotenv()
 
 
 logging.basicConfig(
-    level=logging.INFO,                      # Minimum level to log
-    format="%(asctime)s - %(levelname)s - %(message)s"  # Format of each log line
+    level=logging.INFO,  # Minimum level to log
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Format of each log line
 )
 
 
@@ -87,8 +82,8 @@ class PlaylistItem:
     _name: str
     _duration_ms: int
     _track_id: str
-    _isrc: Optional[str]
-    _added_at: Optional[str]
+    _isrc: str | None
+    _added_at: str | None
 
     def __init__(self, artists, name, duration_ms=0, track_id="", isrc=None, added_at=None):
         self._artists = artists
@@ -155,8 +150,9 @@ def authenticate():
     are public (or explicitly shared with the app in dev mode). It cannot read
     a private playlist. If this starts returning 401/403, that is why.
     """
-    missing = [name for name in ("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")
-               if not os.environ.get(name)]
+    missing = [
+        name for name in ("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET") if not os.environ.get(name)
+    ]
 
     if missing:
         raise KeyError(
@@ -173,25 +169,18 @@ def authenticate():
 
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": f"Basic {encoded}"
+        "Authorization": f"Basic {encoded}",
     }
 
-    data = {
-        "grant_type": "client_credentials"
-    }
+    data = {"grant_type": "client_credentials"}
 
-    response = http.post(
-        url,
-        headers=headers,
-        data=data,
-        timeout=30
-    )
+    response = http.post(url, headers=headers, data=data, timeout=30)
     response.raise_for_status()
 
     return response.json()["access_token"]
 
 
-def objectize_item(item: dict) -> Optional[PlaylistItem]:
+def objectize_item(item: dict) -> PlaylistItem | None:
     """Turn a Spotify response dict into a PlaylistItem.
 
     Returns None for entries that are not playable tracks (podcast episodes,
@@ -203,7 +192,9 @@ def objectize_item(item: dict) -> Optional[PlaylistItem]:
         return None
 
     if track.get("type") != "track":
-        logging.warning("Skipping non-track entry of type %r: %s", track.get("type"), track.get("name"))
+        logging.warning(
+            "Skipping non-track entry of type %r: %s", track.get("type"), track.get("name")
+        )
         return None
 
     if track.get("is_local"):
@@ -227,7 +218,7 @@ def objectize_item(item: dict) -> Optional[PlaylistItem]:
     )
 
 
-def get_playlist_items(token: str, playlist_id: str) -> List[PlaylistItem]:
+def get_playlist_items(token: str, playlist_id: str) -> list[PlaylistItem]:
     """Return every track in the playlist, following pagination.
 
     Spotify caps a page at 100 items and returns a `next` URL. Reading only
@@ -235,12 +226,9 @@ def get_playlist_items(token: str, playlist_id: str) -> List[PlaylistItem]:
     """
     url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit=100"
 
-    headers = {
-        "content-type": "json",
-        "Authorization": f"Bearer {token}"
-    }
+    headers = {"content-type": "json", "Authorization": f"Bearer {token}"}
 
-    items: List[PlaylistItem] = []
+    items: list[PlaylistItem] = []
     pages = 0
 
     while url:
@@ -297,7 +285,7 @@ def build_existing_index(directory: str) -> dict:
     return index
 
 
-def already_downloaded(item: PlaylistItem, existing_index: dict) -> Optional[str]:
+def already_downloaded(item: PlaylistItem, existing_index: dict) -> str | None:
     """Return the existing filename for this track, or None if it is missing.
 
     Exact match on the predictable schema first, then a normalized match so
@@ -310,7 +298,7 @@ def already_downloaded(item: PlaylistItem, existing_index: dict) -> Optional[str
     return existing_index.get(normalize_for_compare(item.filename_stem()))
 
 
-def score_video(video, item: PlaylistItem) -> Optional[float]:
+def score_video(video, item: PlaylistItem) -> float | None:
     """Score a YouTube result against a track. Higher is better, None = reject.
 
     Duration is a hard gate: a result outside the tolerance is a different
@@ -341,7 +329,7 @@ def get_search_results(artist: str, song: str) -> list:
     return Search(f"{artist} {song}").videos
 
 
-def get_download_url(item: PlaylistItem) -> Optional[tuple]:
+def get_download_url(item: PlaylistItem) -> tuple | None:
     """Pick the best YouTube result for a track.
 
     Returns (url, title) for the winner, or None if nothing survived.
@@ -377,7 +365,11 @@ def get_download_url(item: PlaylistItem) -> Optional[tuple]:
         # take the closest and flag it so it can be reviewed or deleted.
         try:
             closest = min(results, key=lambda v: abs((v.length or 0) - item.duration_s))
-            closest_url, closest_title, closest_len = closest.watch_url, closest.title, closest.length
+            closest_url, closest_title, closest_len = (
+                closest.watch_url,
+                closest.title,
+                closest.length,
+            )
         except Exception as error:
             logging.error("Could not read any result for %r: %s", search_term, error)
             return None
@@ -463,7 +455,7 @@ def download_song(url: str, destination: str):
     return destination
 
 
-def download_playlist_items(items: List[PlaylistItem], limit: Optional[int] = None) -> dict:
+def download_playlist_items(items: list[PlaylistItem], limit: int | None = None) -> dict:
     """Download every item that is not already on disk. Never raises."""
     os.makedirs(SAMPLES_DIR, exist_ok=True)
 
@@ -516,7 +508,7 @@ def download_playlist_items(items: List[PlaylistItem], limit: Optional[int] = No
     return stats
 
 
-def filter_added_after(items: List[PlaylistItem], cutoff: str) -> List[PlaylistItem]:
+def filter_added_after(items: list[PlaylistItem], cutoff: str) -> list[PlaylistItem]:
     """Keep only tracks added to the playlist after an ISO timestamp."""
     return [item for item in items if item.added_at and item.added_at > cutoff]
 
@@ -538,7 +530,7 @@ def is_youtube_url(candidate: str) -> bool:
     return bool(re.match(r"^https?://(www\.|m\.)?(youtube\.com|youtu\.be)/", candidate.strip()))
 
 
-def download_single_url(url: str, name: Optional[str] = None, directory: str = None) -> int:
+def download_single_url(url: str, name: str | None = None, directory: str = None) -> int:
     """Download one YouTube video to `directory`. Returns an exit code.
 
     No Spotify involvement, so this works with no credentials configured. The
@@ -635,7 +627,7 @@ def run_app() -> int:
     return 0 if stats["failed"] == 0 else 1
 
 
-def main(argv: Optional[list] = None):
+def main(argv: list | None = None):
     args = parse_args(sys.argv[1:] if argv is None else argv)
 
     if args.command == "url":

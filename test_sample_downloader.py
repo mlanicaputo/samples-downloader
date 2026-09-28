@@ -108,7 +108,7 @@ class SanitizeStem(unittest.TestCase):
         self.assertNotIn(":", sd.sanitize_stem("Jay-Z - 4:44"))
 
     def test_removes_question_and_asterisk(self):
-        result = sd.sanitize_stem('Really? What* Ever')
+        result = sd.sanitize_stem("Really? What* Ever")
         self.assertNotIn("?", result)
         self.assertNotIn("*", result)
 
@@ -172,7 +172,9 @@ class FilenameStemMatchesSanitize(unittest.TestCase):
         # The dedup key must never depend on the YouTube result, or the same
         # track would get a different name on each run.
         item = make_item("Waterfalls", artists=("TLC",))
-        self.assertEqual(item.filename_stem(), make_item("Waterfalls", artists=("TLC",)).filename_stem())
+        self.assertEqual(
+            item.filename_stem(), make_item("Waterfalls", artists=("TLC",)).filename_stem()
+        )
 
     def test_missing_artists_falls_back(self):
         item = sd.PlaylistItem([], "Untitled Track")
@@ -203,19 +205,27 @@ class ScoreVideo(unittest.TestCase):
 
     def test_rejects_far_too_long(self):
         # A 10 minute mix for a 3:23 track.
-        self.assertIsNone(sd.score_video(FakeVideo("Kool & The Gang - Summer Madness", 600), self.item))
+        self.assertIsNone(
+            sd.score_video(FakeVideo("Kool & The Gang - Summer Madness", 600), self.item)
+        )
 
     def test_rejects_far_too_short(self):
         # A 30 second preview.
-        self.assertIsNone(sd.score_video(FakeVideo("Kool & The Gang - Summer Madness", 30), self.item))
+        self.assertIsNone(
+            sd.score_video(FakeVideo("Kool & The Gang - Summer Madness", 30), self.item)
+        )
 
     def test_within_tolerance_is_accepted(self):
         # 8% off, inside the default 15% gate.
-        self.assertIsNotNone(sd.score_video(FakeVideo("Kool & The Gang - Summer Madness", 187), self.item))
+        self.assertIsNotNone(
+            sd.score_video(FakeVideo("Kool & The Gang - Summer Madness", 187), self.item)
+        )
 
     def test_outside_tolerance_is_rejected(self):
         # 20% off, outside the gate.
-        self.assertIsNone(sd.score_video(FakeVideo("Kool & The Gang - Summer Madness", 162), self.item))
+        self.assertIsNone(
+            sd.score_video(FakeVideo("Kool & The Gang - Summer Madness", 162), self.item)
+        )
 
     def test_title_beats_a_closer_but_wrong_result(self):
         """The real-world TLC case.
@@ -257,7 +267,9 @@ class ScoreVideo(unittest.TestCase):
         # "Summer Madness (Extended Mix)" is 10 minutes; length rejects it even
         # though the title looks close.
         self.assertIsNone(
-            sd.score_video(FakeVideo("Kool & The Gang - Summer Madness (Extended Mix)", 600), self.item)
+            sd.score_video(
+                FakeVideo("Kool & The Gang - Summer Madness (Extended Mix)", 600), self.item
+            )
         )
 
 
@@ -387,22 +399,42 @@ class ObjectizeItem(unittest.TestCase):
     """Non-track playlist entries must be skipped, not crash the run."""
 
     def test_track(self):
-        item = sd.objectize_item({"added_at": "2024-01-01T00:00:00Z", "track": {
-            "type": "track", "name": "Song", "artists": [{"name": "Artist"}],
-            "duration_ms": 1000, "id": "abc",
-            "external_ids": {"isrc": "USABC1234567"},
-        }})
+        item = sd.objectize_item(
+            {
+                "added_at": "2024-01-01T00:00:00Z",
+                "track": {
+                    "type": "track",
+                    "name": "Song",
+                    "artists": [{"name": "Artist"}],
+                    "duration_ms": 1000,
+                    "id": "abc",
+                    "external_ids": {"isrc": "USABC1234567"},
+                },
+            }
+        )
         self.assertIsNotNone(item)
         self.assertEqual(item.name, "Song")
         self.assertEqual(item.artists, ["Artist"])
         self.assertEqual(item.isrc, "USABC1234567")
 
     def test_podcast_episode_skipped(self):
-        self.assertIsNone(sd.objectize_item({"track": {"type": "episode", "name": "Ep", "artists": []}}))
+        self.assertIsNone(
+            sd.objectize_item({"track": {"type": "episode", "name": "Ep", "artists": []}})
+        )
 
     def test_local_file_skipped(self):
-        self.assertIsNone(sd.objectize_item({"track": {
-            "type": "track", "is_local": True, "name": "Local", "artists": [{"name": "A"}]}}))
+        self.assertIsNone(
+            sd.objectize_item(
+                {
+                    "track": {
+                        "type": "track",
+                        "is_local": True,
+                        "name": "Local",
+                        "artists": [{"name": "A"}],
+                    }
+                }
+            )
+        )
 
     def test_removed_entry_skipped(self):
         self.assertIsNone(sd.objectize_item({"track": None}))
@@ -414,9 +446,15 @@ class ObjectizeItem(unittest.TestCase):
         self.assertIsNone(sd.objectize_item({"track": {"type": "track", "name": "S"}}))
 
     def test_tolerates_absent_optional_fields(self):
-        item = sd.objectize_item({"track": {
-            "type": "track", "name": "S", "artists": [{"name": "A"}],
-        }})
+        item = sd.objectize_item(
+            {
+                "track": {
+                    "type": "track",
+                    "name": "S",
+                    "artists": [{"name": "A"}],
+                }
+            }
+        )
         self.assertIsNotNone(item)
         self.assertEqual(item.duration_ms, 0)
         self.assertIsNone(item.isrc)

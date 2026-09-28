@@ -4,6 +4,18 @@ PY := .venv/bin/python
 test:
 	$(PY) -m unittest test_sample_downloader -v
 
+# Lint and format. `lint` reports, `format` rewrites in place.
+# uvx runs ruff without adding it to the venv.
+lint:
+	uvx ruff check .
+
+format:
+	uvx ruff check . --fix
+	uvx ruff format .
+
+# Everything CI should run.
+check: lint test
+
 pull:
 	$(PY) sample_downloader.py
 

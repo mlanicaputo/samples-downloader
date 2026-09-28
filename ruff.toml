@@ -1,0 +1,18 @@
+target-version = "py313"
+line-length = 100
+
+[lint]
+# E/W: pycodestyle. F: pyflakes. I: import sorting. UP: pyupgrade.
+# B: bugbear. SIM: flake8-simplify.
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+# Long lines are not worth failing a build over in a script this size; the
+# formatter handles wrapping for anything it can.
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+# Tests get longer names and more nesting than production code.
+"test_*.py" = ["E501"]
+
+[format]
+quote-style = "double"
