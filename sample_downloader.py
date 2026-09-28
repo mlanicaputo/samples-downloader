@@ -7,8 +7,8 @@ value for one run without editing the file.
 
     SPOTIFY_CLIENT_ID      required
     SPOTIFY_CLIENT_SECRET  required
-    SPOTIFY_PLAYLIST_ID    defaults to the TLC playlist
-    SAMPLES_DIR            where m4a files land
+    SPOTIFY_PLAYLIST_ID    required
+    SAMPLES_DIR            required, where m4a files land
     DURATION_TOLERANCE      how far a YouTube result may differ in length (0.15 = 15%)
     ADDED_AFTER            only consider tracks added to the playlist after this ISO date
     LIMIT                  stop after N downloads (testing)
@@ -49,8 +49,10 @@ logging.basicConfig(
 )
 
 
-PLAYLIST_ID = os.environ.get("SPOTIFY_PLAYLIST_ID", "1wmSX8uXxNxYhZUw5YR3CN")
-SAMPLES_DIR = os.environ.get("SAMPLES_DIR", "/Users/milo/Music/Logic/samples")
+# Required. Deliberately has no fallback: a silent default would pull the wrong
+# playlist, or write to a directory the person running it never chose.
+PLAYLIST_ID = os.environ.get("SPOTIFY_PLAYLIST_ID")
+SAMPLES_DIR = os.environ.get("SAMPLES_DIR")
 
 # A YouTube result is only considered a match if its length is within this
 # fraction of the Spotify duration. Guards against grabbing a 10 minute mix
@@ -143,6 +145,17 @@ class PlaylistItem:
         return f"{self.filename_stem()}.m4a"
 
 
+def require_config(*names: str) -> None:
+    """Raise a readable KeyError if any named config value is unset."""
+    missing = [name for name in names if not os.environ.get(name)]
+
+    if missing:
+        raise KeyError(
+            f"{', '.join(missing)} not set. Export it, or add it to a .env file "
+            f"in this directory. See .env.example."
+        )
+
+
 def authenticate():
     """Return a valid Spotify session token.
 
@@ -150,15 +163,7 @@ def authenticate():
     are public (or explicitly shared with the app in dev mode). It cannot read
     a private playlist. If this starts returning 401/403, that is why.
     """
-    missing = [
-        name for name in ("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET") if not os.environ.get(name)
-    ]
-
-    if missing:
-        raise KeyError(
-            f"{', '.join(missing)} not set. Export it, or add it to a .env file "
-            f"in this directory. See .env.example."
-        )
+    require_config("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")
 
     client_id = os.environ["SPOTIFY_CLIENT_ID"]
     client_secret = os.environ["SPOTIFY_CLIENT_SECRET"]
@@ -533,10 +538,15 @@ def is_youtube_url(candidate: str) -> bool:
 def download_single_url(url: str, name: str | None = None, directory: str = None) -> int:
     """Download one YouTube video to `directory`. Returns an exit code.
 
-    No Spotify involvement, so this works with no credentials configured. The
-    filename comes from --name when given, otherwise the video's own title.
+    No Spotify involvement, so no credentials are needed. A directory is still
+    required, from --dir or SAMPLES_DIR; there is no default to fall back on.
+    The filename comes from --name when given, otherwise the video's own title.
     """
     destination_dir = directory or SAMPLES_DIR
+
+    if not destination_dir:
+        logging.error("No output directory. Pass --dir, or set SAMPLES_DIR.")
+        return 2
 
     if not is_youtube_url(url):
         logging.error("Not a YouTube URL: %s", url)
@@ -599,6 +609,7 @@ def parse_args(argv: list):
 
 
 def run_app() -> int:
+    require_config("SPOTIFY_PLAYLIST_ID", "SAMPLES_DIR")
     token = authenticate()
 
     items = get_playlist_items(token, PLAYLIST_ID)

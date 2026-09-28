@@ -1,7 +1,8 @@
 # samples-downloader
 
-Downloads tracks from a Spotify playlist as `.m4a` files you can drag into
-Logic. Skips anything already on disk, so `make pull` is safe to re-run.
+Downloads tracks from a Spotify playlist as `.m4a` files, named
+`Artist - Title` so they drop straight into a DAW or a samples folder. Skips
+anything already on disk, so `make pull` is safe to re-run.
 
 ## Setup
 
@@ -13,9 +14,19 @@ uv pip install pytubefix requests python-dotenv
 cp .env.example .env
 ```
 
-Then fill in `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` in `.env` from the
-Spotify developer dashboard (your app → Settings). `.env` is gitignored and
-never read by the app until you create it.
+Then fill in these four values in `.env`:
+
+| Variable | Where to get it |
+| --- | --- |
+| `SPOTIFY_CLIENT_ID` | Developer dashboard → your app → Settings |
+| `SPOTIFY_CLIENT_SECRET` | Same page |
+| `SPOTIFY_PLAYLIST_ID` | Last path segment of a playlist URL: `open.spotify.com/playlist/<THIS>` |
+| `SAMPLES_DIR` | Wherever you want the files, e.g. `~/Music/samples` |
+
+All four are required and none has a built-in default, so a fresh clone will
+tell you exactly what's missing instead of guessing at a playlist or a
+directory. `SAMPLES_DIR` is created if it doesn't exist. `.env` is gitignored
+and never read until you create it.
 
 If the playlist is private, add your Spotify user to the app's allowlist in
 dashboard → Settings → User Management. The app uses the
@@ -46,20 +57,21 @@ make test-pull         # first 3 missing tracks
 Download a single YouTube video, by URL:
 
 ```sh
-make one URL="https://youtu.be/aOYHN42AjIc"
-make one URL="https://youtu.be/aOYHN42AjIc" NAME="TLC - No Scrubs"
+make one URL="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+make one URL="https://www.youtube.com/watch?v=dQw4w9WgXcQ" NAME="Artist - Title"
 ```
 
 Or call the script directly:
 
 ```sh
 .venv/bin/python sample_downloader.py                                  # whole playlist
-.venv/bin/python sample_downloader.py url "https://youtu.be/aOYHN42AjIc"
-.venv/bin/python sample_downloader.py url "https://youtu.be/aOYHN42AjIc" --name "TLC - No Scrubs"
-.venv/bin/python sample_downloader.py url "https://youtu.be/aOYHN42AjIc" --dir /tmp/scratch
+.venv/bin/python sample_downloader.py url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+.venv/bin/python sample_downloader.py url "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --name "Artist - Title"
+.venv/bin/python sample_downloader.py url "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --dir /tmp/scratch
 ```
 
-The `url` form never contacts Spotify, so it works without credentials.
+The `url` form never contacts Spotify, so no credentials are needed. It does
+still need somewhere to write — `--dir`, or `SAMPLES_DIR` in `.env`.
 
 ## Development
 
@@ -110,8 +122,8 @@ DRY_RUN=1 SAMPLES_DIR=/tmp/scratch make pull
 | --- | --- | --- |
 | `SPOTIFY_CLIENT_ID` | — | Required for playlist pulls |
 | `SPOTIFY_CLIENT_SECRET` | — | Required for playlist pulls |
-| `SPOTIFY_PLAYLIST_ID` | `1wmSX8uXxNxYhZUw5YR3CN` | Playlist to read |
-| `SAMPLES_DIR` | `/Users/milo/Music/Logic/samples` | Where files land |
+| `SPOTIFY_PLAYLIST_ID` | — | Required for playlist pulls |
+| `SAMPLES_DIR` | — | Required. Where files land |
 | `DURATION_TOLERANCE` | `0.15` | How far a YouTube result's length may differ from Spotify's, as a fraction. Lower is stricter |
 | `ADDED_AFTER` | — | ISO timestamp; only consider tracks added after it |
 | `LIMIT` | — | Stop after N download attempts |
@@ -143,9 +155,9 @@ the dedup key, so a track downloads exactly once.
   end usually means a few unavailable YouTube videos, not a broken run. Read
   the summary line for the real counts.
 - **Skips match loosely.** Existing files are matched after stripping
-  parentheticals, so `Dayglow - Hot Rod (Official Video).m4a` is recognised as
-  the same track as `Dayglow - Hot Rod`. The single-URL form only matches
-  exactly, so pass `--name` matching your existing files to avoid a duplicate.
+  parentheticals, so `Artist - Title (Official Video).m4a` is recognised as the
+  same track as `Artist - Title`. The single-URL form only matches exactly, so
+  pass `--name` matching your existing files to avoid a duplicate.
 - **A failed download leaves nothing behind.** Partial files are written to a
   `.part.m4a` sidecar and renamed into place only on success, so a truncated
   file can never be mistaken for a completed one on the next run.
@@ -153,6 +165,7 @@ the dedup key, so a track downloads exactly once.
   the `next` URL, so playlists over 100 aren't silently truncated.
 - **Non-tracks are skipped.** Podcast episodes and local files in the playlist
   are logged and passed over.
-- **A first run downloads a lot.** This playlist shares almost nothing with the
-  existing contents of your samples folder, so expect ~100 tracks and 15–25
-  minutes. Use `make test-pull` first.
+- **A first run can be a long one.** The app has no way to know how much of a
+  playlist you already hold elsewhere, so it will try every track. A 100-track
+  playlist takes roughly 15–25 minutes. Start with `make test-pull` or
+  `make dry-run` to see the scope before committing to it.
