@@ -1,5 +1,9 @@
 PY := .venv/bin/python
 
+# Pure-logic tests. No network, no credentials, safe to run any time.
+test:
+	$(PY) -m unittest test_sample_downloader -v
+
 pull:
 	$(PY) sample_downloader.py
 

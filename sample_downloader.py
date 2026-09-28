@@ -38,7 +38,7 @@ import unicodedata
 import json
 import base64
 
-import requests as re_
+import requests as http
 from dotenv import load_dotenv
 from typing import List, Optional
 
@@ -67,7 +67,12 @@ MAX_FILENAME_STEM = 200
 
 # Characters that are legal in a POSIX filename but hostile to a shell, Finder,
 # Logic, or a DAW's file browser.
-_ILLEGAL = re.compile(r'[/\\:*?"<>|\x00-\x1f]')
+_ILLEGAL = re.compile(r'[/\\:*?"<>|]')
+
+# Control characters, tabs and newlines among them. These become a space rather
+# than being deleted, so a tab between two words cannot glue them together.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
 _WHITESPACE = re.compile(r"\s+")
 
 
@@ -137,11 +142,7 @@ class PlaylistItem:
         the same track, so this must not depend on the YouTube result.
         """
         artist = ", ".join(self.artists) if self.artists else "Unknown Artist"
-        stem = f"{artist} - {self.name}"
-        stem = unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode()
-        stem = _ILLEGAL.sub("", stem)
-        stem = _WHITESPACE.sub(" ", stem).strip(" .-")
-        return stem[:MAX_FILENAME_STEM].strip(" .-")
+        return sanitize_stem(f"{artist} - {self.name}")
 
     def target_filename(self) -> str:
         return f"{self.filename_stem()}.m4a"
@@ -179,7 +180,7 @@ def authenticate():
         "grant_type": "client_credentials"
     }
 
-    response = re_.post(
+    response = http.post(
         url,
         headers=headers,
         data=data,
@@ -243,7 +244,7 @@ def get_playlist_items(token: str, playlist_id: str) -> List[PlaylistItem]:
     pages = 0
 
     while url:
-        response = re_.get(url, headers=headers, timeout=30)
+        response = http.get(url, headers=headers, timeout=30)
         response.raise_for_status()
         payload = response.json()
 
@@ -527,6 +528,7 @@ def sanitize_stem(text: str) -> str:
     a Spotify track are cleaned identically.
     """
     stem = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    stem = _CONTROL.sub(" ", stem)
     stem = _ILLEGAL.sub("", stem)
     stem = _WHITESPACE.sub(" ", stem).strip(" .-")
     return stem[:MAX_FILENAME_STEM].strip(" .-")
