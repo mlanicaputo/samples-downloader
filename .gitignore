@@ -1,0 +1,20 @@
+# Secrets. .env.example is tracked; .env is not.
+.env
+
+# Virtualenvs.
+.venv/
+venv/
+
+# Python bytecode.
+__pycache__/
+*.pyc
+
+# macOS Finder metadata.
+.DS_Store
+
+# Response dumps from spotify api experiments.
+post_response*.json
+
+# Downloaded samples. Uncomment if you ever version this directory.
+# samples/
+test.ipynb

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Project-local. The global config denies writing *.env.*, which also
+  // matches .env.example and made the template impossible to create. Allowing
+  // it here keeps that exception scoped to this repo instead of granting it
+  // across every project, where a real .env.example might live.
+  //
+  // Loaded after the global config, so this rule is evaluated later and wins.
+  // Secrets are still protected: .env and .env.* keep matching the global deny.
+  "permissions": [
+    { "action": "edit", "resource": "*.env.example", "effect": "allow" }
+  ]
+}
